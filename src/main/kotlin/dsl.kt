@@ -48,13 +48,13 @@ fun ConfigDsl.beanDecorator(order: Int = 0, block: DecoratorDsl.(Any) -> Any) {
 fun Container(config: Config): Container {
     val decorators = config.decorators.sortedBy { it.order }.map { it.get }
     val providers = config.providers.map { provider ->
-        decorators.fold(provider) { acc, decorator -> Annotated(acc.annotations, decorator(acc)) }
+        decorators.fold(provider) { acc, decorator -> acc.map { decorator(acc) } }
     }
     val container = object : Container {
         @Suppress("UNCHECKED_CAST")
         override fun <T> get(predicate: Predicate<Annotations>): T =
             providers.first { predicate(it.annotations) }.get(this) as T
     }
-    val beans = providers.map { p -> Annotated(p.annotations, p.get(container)) }
+    val beans = providers.map { provider -> provider.map { it(container) } }
     return BeanContainer(beans)
 }
