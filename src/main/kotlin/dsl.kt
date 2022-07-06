@@ -53,7 +53,7 @@ fun Container(config: Config): Container {
     val container = object : Container {
         @Suppress("UNCHECKED_CAST")
         override fun <T> get(predicate: Predicate<Annotations>): T =
-            providers.first { predicate(it.annotations) }.get(this) as T
+            providers.single { predicate(it.annotations) }.get(this) as T
     }
     val beans = providers.map { provider -> provider.map { it(container) } }
     return BeanContainer(beans)
