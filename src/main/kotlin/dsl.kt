@@ -47,6 +47,7 @@ fun ConfigDsl.beanDecorator(order: Int = 0, block: DecoratorDsl.(Any) -> Any) {
 
 fun Container(config: Config): Container {
     val decorators = config.decorators.sortedBy { it.order }.map { it.get }
+        .plus { provider -> memoized(provider.get) }
     val providers = config.providers.map { provider ->
         decorators.fold(provider) { acc, decorator -> acc.map { decorator(acc) } }
     }
@@ -58,3 +59,15 @@ fun Container(config: Config): Container {
     val beans = providers.map { provider -> provider.map { it(container) } }
     return BeanContainer(beans)
 }
+
+fun memoized(provider: Provider): Provider =
+    with(object { @Volatile var value: Any? = null }) {
+        { container ->
+            value ?: synchronized(provider) {
+                value ?: run {
+                    value = provider(container)
+                    value!!
+                }
+            }
+        }
+    }

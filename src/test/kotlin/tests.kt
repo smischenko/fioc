@@ -1,6 +1,7 @@
 import org.example.fioc.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 
 class Tests {
     @Test
@@ -46,5 +47,24 @@ class Tests {
 
         val priceCalculator: PriceCalculator = container.get(name("priceCalculator"))
         assertEquals(900, priceCalculator.calculatePrice(productId = 1, count = 10))
+    }
+
+    @Test
+    fun `test container create single bean instance`() {
+        class DataSource
+        class Service(val dataSource: DataSource)
+
+        val container = container {
+            bean(name("service")) {
+                Service(container.get(name("dataSource")))
+            }
+            bean(name("dataSource")) {
+                DataSource()
+            }
+        }
+
+        val dataSource: DataSource = container.get(name("dataSource"))
+        val service: Service = container.get(name("service"))
+        assertSame(dataSource, service.dataSource)
     }
 }
