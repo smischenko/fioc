@@ -16,6 +16,7 @@ fun <T, U> Annotated<T>.map(f: (T) -> U): Annotated<U> = Annotated(annotations, 
 data class Name(val value: String): Annotation {
     companion object Key: Annotation.Key<Name>
     override val key: Annotation.Key<*> = Key
+    override fun toString(): String = "Name{$value}"
 }
 
 fun name(value: String): Name = Name(value)

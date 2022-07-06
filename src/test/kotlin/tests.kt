@@ -1,6 +1,7 @@
 import org.example.fioc.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
 class Tests {
@@ -66,5 +67,53 @@ class Tests {
         val dataSource: DataSource = container.get(name("dataSource"))
         val service: Service = container.get(name("service"))
         assertSame(dataSource, service.dataSource)
+    }
+
+    @Test
+    fun `test cycle dependency detected`() {
+        val exception = assertFailsWith<RuntimeException> {
+            container {
+                bean(name("serviceA")) {
+                    object {
+                        private val serviceB: Any = container.get(name("serviceB"))
+                    }
+                }
+                bean(name("serviceB")) {
+                    object {
+                        private val serviceC: Any = container.get(name("serviceC"))
+                    }
+                }
+                bean(name("serviceC")) {
+                    object {
+                        private val serviceA: Any = container.get(name("serviceA"))
+                    }
+                }
+            }
+        }
+        assertEquals("Cycle dependency detected: [Name{serviceA}]->[Name{serviceB}]->[Name{serviceC}]", exception.message)
+    }
+
+    @Test
+    fun `test cycle dependency detected 2`() {
+        val exception = assertFailsWith<RuntimeException> {
+            container {
+                bean(name("serviceA")) {
+                    object {
+                        private val serviceB: Any = container.get(name("serviceB"))
+                    }
+                }
+                bean(name("serviceB")) {
+                    object {
+                        private val serviceC: Any = container.get(name("serviceC"))
+                    }
+                }
+                bean(name("serviceC")) {
+                    object {
+                        private val serviceB: Any = container.get(name("serviceB"))
+                    }
+                }
+            }
+        }
+        assertEquals("Cycle dependency detected: [Name{serviceB}]->[Name{serviceC}]", exception.message)
     }
 }

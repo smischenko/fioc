@@ -51,12 +51,17 @@ fun Container(config: Config): Container {
     val providers = config.providers.map { provider ->
         decorators.fold(provider) { acc, decorator -> acc.map { decorator(acc) } }
     }
-    val container = object : Container {
+
+    class State(val path: List<Annotated<Provider>>) : Container {
         @Suppress("UNCHECKED_CAST")
         override fun <T> get(predicate: Predicate<Annotations>): T =
-            providers.single { predicate(it.annotations) }.get(this) as T
+            providers.single { predicate(it.annotations) }.let { provider ->
+                if (path.contains(provider)) throw RuntimeException("Cycle dependency detected: ${path.drop(path.indexOf(provider)).map { it.annotations }.joinToString("->")}")
+                else provider.get(State(path.plus(provider))) as T
+            }
     }
-    val beans = providers.map { provider -> provider.map { it(container) } }
+
+    val beans = providers.map { provider -> provider.map { it(State(listOf(provider))) } }
     return BeanContainer(beans)
 }
 
