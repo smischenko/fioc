@@ -30,7 +30,7 @@ Usage example:
             }
         }
         // Price discount as price calculator decorator
-        beanDecorator { bean ->
+        beanPostProcessor { bean ->
             if (annotations[Name]?.value == "priceCalculator")
                 object : PriceCalculator {
                     override fun calculatePrice(productId: Int, count: Int): Int {
