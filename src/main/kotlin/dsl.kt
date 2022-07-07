@@ -19,10 +19,16 @@ fun Config.beanDefinition(beanDefinition: BeanDefinition): Config =
 fun Config.beanDefinitionTransformer(order: Int, transformer: (BeanDefinition) -> BeanDefinition): Config =
     copy(beanDefinitionTransformers = this.beanDefinitionTransformers.plus(Ordered(order, transformer)))
 
+@DslMarker
+annotation class ConfigDslMarker
+
+@ConfigDslMarker
 data class ConfigDsl(var config: Config)
 
+@ConfigDslMarker
 data class BeanDsl(val container: Container)
 
+@ConfigDslMarker
 data class BeanPostProcessorDsl(
     val container: Container,
     val annotations: Annotations
