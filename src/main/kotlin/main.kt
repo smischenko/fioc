@@ -1,10 +1,19 @@
 package org.example.fioc
 
+import kotlin.reflect.KClass
+import kotlin.reflect.full.isSubclassOf
+
 interface Container {
-    fun <T> get(predicate: Predicate<Annotations>): T
+    fun <T> get(predicate: Predicate<BeanDescription>): T
 }
 
 typealias Predicate<T> = (T) -> Boolean
+
+data class BeanDescription(
+    val name: String,
+    val type: KClass<*>,
+    val annotations: Annotations
+)
 
 typealias Annotations = List<Annotation>
 
@@ -13,10 +22,12 @@ interface Annotation {
     val key: Key<*>
 }
 
-data class Annotated<T>(val annotations: Annotations, val get: T)
+fun <T> Container.get(name: String): T = get { it.name == name }
 
-data class BeanContainer(val beans: List<Annotated<*>>) : Container {
+inline fun <reified T> Container.get(): T = get { it.type.isSubclassOf(T::class) }
+
+data class BeanContainer(val beans: List<Pair<BeanDescription, Any>>) : Container {
     @Suppress("UNCHECKED_CAST")
-    override fun <T> get(predicate: Predicate<Annotations>): T =
-        beans.single { predicate(it.annotations) }.get as T
+    override fun <T> get(predicate: Predicate<BeanDescription>): T =
+        beans.single { predicate(it.first) }.second as T
 }

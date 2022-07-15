@@ -1,8 +1,6 @@
 import org.example.fioc.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertSame
+import kotlin.reflect.full.isSubclassOf
+import kotlin.test.*
 
 class Tests {
     @Test
@@ -16,7 +14,7 @@ class Tests {
         }
 
         val container = container {
-            bean(name("priceCatalog")) {
+            bean<PriceCatalog> {
                 object : PriceCatalog() {
                     override fun getPrice(productId: Int): Int =
                         when (productId) {
@@ -25,8 +23,8 @@ class Tests {
                         }
                 }
             }
-            bean(name("priceCalculator")) {
-                val priceCatalog: PriceCatalog = container.get(name("priceCatalog"))
+            bean<PriceCalculator> {
+                val priceCatalog = container.get<PriceCatalog>()
                 object : PriceCalculator() {
                     override fun calculatePrice(productId: Int, count: Int): Int =
                         priceCatalog.getPrice(productId) * count
@@ -34,7 +32,7 @@ class Tests {
             }
             // Price discount as price calculator decorator
             beanPostProcessor { bean ->
-                if (annotations[Name]?.value == "priceCalculator")
+                if (beanDescription.type == PriceCalculator::class)
                     object : PriceCalculator() {
                         override fun calculatePrice(productId: Int, count: Int): Int {
                             val price = (bean as PriceCalculator).calculatePrice(productId, count)
@@ -46,7 +44,7 @@ class Tests {
             }
         }
 
-        val priceCalculator: PriceCalculator = container.get(name("priceCalculator"))
+        val priceCalculator = container.get<PriceCalculator>()
         assertEquals(900, priceCalculator.calculatePrice(productId = 1, count = 10))
     }
 
@@ -56,16 +54,16 @@ class Tests {
         class Service(val dataSource: DataSource)
 
         val container = container {
-            bean(name("service")) {
-                Service(container.get(name("dataSource")))
+            bean {
+                Service(container.get())
             }
-            bean(name("dataSource")) {
+            bean {
                 DataSource()
             }
         }
 
-        val dataSource: DataSource = container.get(name("dataSource"))
-        val service: Service = container.get(name("service"))
+        val dataSource = container.get<DataSource>()
+        val service = container.get<Service>()
         assertSame(dataSource, service.dataSource)
     }
 
@@ -73,47 +71,47 @@ class Tests {
     fun `test cycle dependency detected`() {
         val exception = assertFailsWith<RuntimeException> {
             container {
-                bean(name("serviceA")) {
+                bean("serviceA") {
                     object {
-                        private val serviceB: Any = container.get(name("serviceB"))
+                        private val serviceB: Any = container.get("serviceB")
                     }
                 }
-                bean(name("serviceB")) {
+                bean("serviceB") {
                     object {
-                        private val serviceC: Any = container.get(name("serviceC"))
+                        private val serviceC: Any = container.get("serviceC")
                     }
                 }
-                bean(name("serviceC")) {
+                bean("serviceC") {
                     object {
-                        private val serviceA: Any = container.get(name("serviceA"))
+                        private val serviceA: Any = container.get("serviceA")
                     }
                 }
             }
         }
-        assertEquals("Cycle dependency detected: [Name{serviceA}]->[Name{serviceB}]->[Name{serviceC}]", exception.message)
+        assertContains(exception.message!!, Regex("serviceA(.)*->(.)*serviceB(.)*->(.)*serviceC"))
     }
 
     @Test
     fun `test cycle dependency detected 2`() {
         val exception = assertFailsWith<RuntimeException> {
             container {
-                bean(name("serviceA")) {
+                bean("serviceA") {
                     object {
-                        private val serviceB: Any = container.get(name("serviceB"))
+                        private val serviceB: Any = container.get("serviceB")
                     }
                 }
-                bean(name("serviceB")) {
+                bean("serviceB") {
                     object {
-                        private val serviceC: Any = container.get(name("serviceC"))
+                        private val serviceC: Any = container.get("serviceC")
                     }
                 }
-                bean(name("serviceC")) {
+                bean("serviceC") {
                     object {
-                        private val serviceB: Any = container.get(name("serviceB"))
+                        private val serviceB: Any = container.get("serviceB")
                     }
                 }
             }
         }
-        assertEquals("Cycle dependency detected: [Name{serviceB}]->[Name{serviceC}]", exception.message)
+        assertContains(exception.message!!, Regex("serviceB(.)*->(.)*serviceC"))
     }
 }

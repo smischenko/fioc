@@ -5,7 +5,10 @@ data class Config(
     val beanDefinitionTransformers: List<Ordered<(BeanDefinition) -> BeanDefinition>>
 )
 
-typealias BeanDefinition = Annotated<BeanFactory>
+data class BeanDefinition(
+    val beanDescription: BeanDescription,
+    val beanFactory: BeanFactory
+)
 
 typealias BeanFactory = (Container) -> Any
 
@@ -31,7 +34,7 @@ data class BeanDsl(val container: Container)
 @ConfigDslMarker
 data class BeanPostProcessorDsl(
     val container: Container,
-    val annotations: Annotations
+    val beanDescription: BeanDescription
 )
 
 fun container(block: ConfigDsl.() -> Unit): Container {
@@ -40,42 +43,47 @@ fun container(block: ConfigDsl.() -> Unit): Container {
     return Container(dsl.config)
 }
 
-fun ConfigDsl.bean(vararg annotations: Annotation, block: BeanDsl.() -> Any) {
-    config = config.beanDefinition(Annotated(listOf(*annotations)) { container -> BeanDsl(container).block() })
+inline fun <reified T : Any> ConfigDsl.bean(
+    name: String = "anonymous",
+    vararg annotations: Annotation = emptyArray(),
+    crossinline block: BeanDsl.() -> T
+) {
+    config = config.beanDefinition(
+        BeanDefinition(BeanDescription(name, T::class, listOf(*annotations)))
+        { container -> BeanDsl(container).block() }
+    )
 }
 
 fun ConfigDsl.beanPostProcessor(order: Int = 0, block: BeanPostProcessorDsl.(Any) -> Any) {
     config = config.beanDefinitionTransformer(order) {
-        it.map { beanFactory ->
-            { container ->
-                val bean = beanFactory(container)
-                BeanPostProcessorDsl(container, it.annotations).block(bean)
-            }
+        BeanDefinition(it.beanDescription) { container ->
+            val bean = it.beanFactory(container)
+            BeanPostProcessorDsl(container, it.beanDescription).block(bean)
         }
     }
 }
 
 fun Container(config: Config): Container {
     val transformers = config.beanDefinitionTransformers.sortedBy { it.order }.map { it.get }
-        .plus { it.map(::memoized) }
+        .plus { BeanDefinition(it.beanDescription, memoized(it.beanFactory)) }
     val beanDefinitions = config.beanDefinitions.map { beanDefinition ->
         transformers.fold(beanDefinition) { acc, transformer -> transformer(acc) }
     }
 
     class State(val path: List<BeanDefinition>) : Container {
         @Suppress("UNCHECKED_CAST")
-        override fun <T> get(predicate: Predicate<Annotations>): T =
-            beanDefinitions.single { predicate(it.annotations) }.let { beanDefinition ->
+        override fun <T> get(predicate: Predicate<BeanDescription>): T =
+            beanDefinitions.single { predicate(it.beanDescription) }.let { beanDefinition ->
                 if (path.contains(beanDefinition)) throw RuntimeException(
                     "Cycle dependency detected: ${
-                        path.drop(path.indexOf(beanDefinition)).map { it.annotations }.joinToString("->")
+                        path.drop(path.indexOf(beanDefinition)).map { it.beanDescription }.joinToString("->")
                     }"
                 )
-                else beanDefinition.get(State(path.plus(beanDefinition))) as T
+                else beanDefinition.beanFactory(State(path.plus(beanDefinition))) as T
             }
     }
 
-    val beans = beanDefinitions.map { it.map { beanFactory -> beanFactory(State(listOf(it))) } }
+    val beans = beanDefinitions.map { it.beanDescription to it.beanFactory(State(listOf(it))) }
     return BeanContainer(beans)
 }
 
