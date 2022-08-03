@@ -13,7 +13,7 @@ Usage example:
     }
     
     val container = container {
-        bean(name("priceCatalog")) {
+        bean<PriceCatalog> {
             object : PriceCatalog {
                 override fun getPrice(productId: Int): Int =
                     when (productId) {
@@ -22,8 +22,8 @@ Usage example:
                     }
                 }
         }
-        bean(name("priceCalculator")) {
-            val priceCatalog: PriceCatalog = container.get(name("priceCatalog"))
+        bean<PriceCalculator> {
+            val priceCatalog: PriceCatalog = container.get<PriceCatalog>()
             object : PriceCalculator {
                 override fun calculatePrice(productId: Int, count: Int): Int =
                     priceCatalog.getPrice(productId) * count
@@ -31,10 +31,10 @@ Usage example:
         }
         // Price discount as price calculator decorator
         beanPostProcessor { bean ->
-            if (annotations[Name]?.value == "priceCalculator")
+            if (bean is PriceCalculator)
                 object : PriceCalculator {
                     override fun calculatePrice(productId: Int, count: Int): Int {
-                        val price = (bean as PriceCalculator).calculatePrice(productId, count)
+                        val price = bean.calculatePrice(productId, count)
                         val discount = (price * 0.1).toInt()
                         return price - discount
                     }
@@ -43,6 +43,6 @@ Usage example:
         }
     }
     
-    val priceCalculator: PriceCalculator = container.get(name("priceCalculator"))
+    val priceCalculator = container.get<PriceCalculator>()
     
     val price = priceCalculator.calculatePrice(productId = 1, count = 10)

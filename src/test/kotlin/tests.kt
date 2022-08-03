@@ -32,10 +32,10 @@ class Tests {
             }
             // Price discount as price calculator decorator
             beanPostProcessor { bean ->
-                if (beanDescription.type == PriceCalculator::class)
+                if (bean is PriceCalculator)
                     object : PriceCalculator() {
                         override fun calculatePrice(productId: Int, count: Int): Int {
-                            val price = (bean as PriceCalculator).calculatePrice(productId, count)
+                            val price = bean.calculatePrice(productId, count)
                             val discount = (price * 0.1).toInt()
                             return price - discount
                         }
